@@ -5,6 +5,7 @@ package provider
 
 import (
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -14,6 +15,10 @@ import (
 )
 
 func TestAccProjectResource(t *testing.T) {
+	if os.Getenv("BETTEREDGE_PLATFORM_URL") == "" || os.Getenv("BETTEREDGE_API_TOKEN") == "" {
+		t.Skip("BETTEREDGE_PLATFORM_URL and BETTEREDGE_API_TOKEN must be set to run this acceptance test")
+	}
+
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
