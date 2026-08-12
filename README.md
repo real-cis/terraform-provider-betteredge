@@ -1,13 +1,13 @@
 # Terraform Provider - real-cis/betteredge
 
-Terraform provider to manage projects and Trusted Execution Domains (TEDs) on the BetterEdge platform.
+Manages projects and Trusted Execution Domains (TEDs) on the BetterEdge platform.
 
 ## Requirements
 
 - [Terraform](https://developer.hashicorp.com/terraform/downloads) >= 1.0
-- [Go](https://golang.org/doc/install) >= 1.25 (only if building the provider yourself)
+- [Go](https://golang.org/doc/install) >= 1.25, only needed if you're building the provider yourself
 
-## Provider Configuration
+## Provider configuration
 
 | Argument | Required | Description |
 |---|---|---|
@@ -30,13 +30,13 @@ provider "betteredge" {}
 
 ### `betteredge_project`
 
-A project on the BetterEdge platform. TEDs are created inside a project.
+A project on the BetterEdge platform.
 
 | Attribute | Required | Description |
 |---|---|---|
-| `name` | yes | Name of the project. Must be 4-32 characters long. Forces replacement on change (no update endpoint). |
-| `description` | no (default `""`) | Free-text description. Forces replacement on change. |
-| `id` | computed | UUID of the project. |
+| `name` | yes | 4-32 characters. Forces replacement (there's no update endpoint). |
+| `description` | no, default `""` | Free text. Forces replacement. |
+| `id` | computed | Project UUID. |
 
 ```hcl
 resource "betteredge_project" "example" {
@@ -47,7 +47,7 @@ resource "betteredge_project" "example" {
 
 ### `betteredge_ted`
 
-A Trusted Execution Domain (TED) on the BetterEdge platform. Every attribute forces replacement on change - the platform API has no update endpoint for an existing TED.
+A Trusted Execution Domain (TED).
 
 | Attribute | Required | Description |
 |---|---|---|
@@ -65,6 +65,11 @@ A Trusted Execution Domain (TED) on the BetterEdge platform. Every attribute for
 | `id` | computed | UUID of the TED. |
 
 ```hcl
+variable "ted_password" {
+  type      = string
+  sensitive = true
+}
+
 resource "betteredge_ted" "example" {
   project_id  = betteredge_project.example.id
   os_name     = "Ubuntu-26"
@@ -76,11 +81,11 @@ resource "betteredge_ted" "example" {
 }
 ```
 
-Creation blocks until the platform's provisioning job completes, so `terraform apply` can take a few minutes for this resource.
+Set `password` with `TF_VAR_ted_password` instead of typing it in each time. If the value changes between runs, Terraform reads that as a real diff and replaces the TED.
 
 ### `betteredge_port_forwarding`
 
-A single port forwarding rule on a TED. The platform only exposes a full-list replace endpoint, so this resource reads the TED's current rules, replaces the one it owns, and writes the whole list back - each `betteredge_port_forwarding` block manages exactly one rule.
+A single port forwarding rule on a TED.
 
 | Attribute | Required | Description |
 |---|---|---|
@@ -95,6 +100,98 @@ resource "betteredge_port_forwarding" "example" {
   port     = "8443"
   protocol = "tcp"
 }
+```
+
+## Example: managing multiple TEDs in a project
+
+[`examples/managing-multiple-teds/main.tf`](examples/managing-multiple-teds/main.tf) covers everything below. Run it from that directory with `dev_overrides` pointed at your local build.
+
+Variables: `project_id` (leave empty to create a new project), `project_name`, `teds` (set of names), `ted_placement` (map of name -> `{module_id, server_id}`, only for names you list), `include_ssh_keys`/`public_ssh_keys`, `port`/`protocol`, `port_forwarded_teds` (subset of `teds` that gets the port rule, defaults to all of them).
+
+**Important**: `teds` and `port_forwarded_teds` are the full set every time, not a diff. Always list every name that should still be there.
+
+### Setup (once per session)
+
+```shell
+export BETTEREDGE_PLATFORM_URL="https://..."
+export BETTEREDGE_API_TOKEN="..."
+export TF_VAR_ted_password="..."
+```
+
+### Project
+
+New project:
+
+```shell
+terraform apply
+```
+
+Existing project:
+
+```shell
+terraform apply -var="project_id=<uuid>"
+```
+
+Delete project:
+
+```shell
+terraform apply -var='teds=[]'
+terraform destroy
+```
+
+### TED
+
+Password only:
+
+```shell
+terraform apply -var='teds=["ted-1"]'
+```
+
+With an SSH key:
+
+```shell
+terraform apply -var='teds=["ted-1"]' -var="include_ssh_keys=true" -var='public_ssh_keys=["ssh-ed25519 AAAA... user@host"]'
+```
+
+On a specific module/server (only names listed in `ted_placement` get manual placement; everything else keeps auto placement):
+
+```shell
+terraform apply -var='teds=["ted-1"]' -var='ted_placement={"ted-1"={module_id="<uuid>",server_id="<uuid>"}}'
+```
+
+Add another one:
+
+```shell
+terraform apply -var='teds=["ted-1","ted-2"]'
+```
+
+Delete a specific TED. Find which name owns the id, then drop that name:
+
+```shell
+terraform output ted_ids
+terraform apply -var='teds=["ted-1"]'
+```
+
+### Port forwarding
+
+Create or update the rule on every TED (default when `port_forwarded_teds` is omitted):
+
+```shell
+terraform apply -var='teds=["ted-1","ted-2"]' -var="port=9443" -var="protocol=tcp"
+```
+
+Remove a port-forwarding rule from a specific TED. List just the names that should still have one:
+
+```shell
+terraform apply -var='teds=["ted-1","ted-2"]' -var='port_forwarded_teds=["ted-1"]'
+```
+
+### Inspecting state
+
+```shell
+terraform state list
+terraform output
+terraform output ted_ids
 ```
 
 ## Importing existing resources
@@ -113,20 +210,20 @@ To generate or update documentation, run `make generate`.
 
 In order to run the full suite of Acceptance tests, run `make testacc`.
 
-*Note:* Acceptance tests create real resources on the BetterEdge platform, and may cost money to run.
+*Note:* Acceptance tests create real resources on the BetterEdge platform.
 
 ```shell
 export BETTEREDGE_PLATFORM_URL="https://..."
 export BETTEREDGE_API_TOKEN="..."
-export TED_PASSWORD="..."                     # required for TED/port forwarding tests
+export TED_PASSWORD="..."
 export BETTEREDGE_TEST_MODULE_ID="..."         # optional, enables the manual placement test
 export BETTEREDGE_TEST_SERVER_ID="..."         # optional, enables the manual placement test
 make testacc
 ```
 
-### Testing locally without publishing
+### Pointing Terraform at your local build
 
-Point `~/.terraformrc` at your local build so Terraform uses it instead of the registry:
+Point `~/.terraformrc` at your local build:
 
 ```hcl
 provider_installation {
@@ -138,4 +235,4 @@ provider_installation {
 }
 ```
 
-With `dev_overrides` active, skip `terraform init` - it isn't needed and Terraform will warn that the override is in effect.
+Skip `terraform init` while `dev_overrides` is active.
