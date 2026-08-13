@@ -85,13 +85,13 @@ locals {
 }
 
 resource "betteredge_ted" "example" {
-  for_each    = var.teds
-  project_id  = local.project_id
-  os_name     = "Ubuntu-26"
-  vcpu        = 2
-  memory_gb   = 2
-  storage_gb  = 50
-  description = "TED ${each.key} created by Terraform"
+  for_each         = var.teds
+  project_id       = local.project_id
+  os_name          = "Ubuntu-26"
+  vcpu             = 2
+  memory_gb        = 2
+  storage_gb       = 50
+  description      = "TED ${each.key} created by Terraform"
   password         = var.ted_password
   module_id        = try(var.ted_placement[each.key].module_id, null)
   server_id        = try(var.ted_placement[each.key].server_id, null)
