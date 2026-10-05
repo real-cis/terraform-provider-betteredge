@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
+	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/hashicorp/terraform-plugin-testing/statecheck"
 	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
 )
@@ -39,6 +41,22 @@ func TestAccTEDResource(t *testing.T) {
 				ImportState:             true,
 				ImportStateVerify:       true,
 				ImportStateVerifyIgnore: []string{"password", "include_ssh_keys", "public_ssh_keys"},
+			},
+			{
+				Config: strings.Replace(testAccTEDResourceConfig(password), "storage_gb  = 50\n  description = \"created by acceptance test\"", "storage_gb  = 50\n  description = \"updated by acceptance test\"", 1),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction("betteredge_ted.test", plancheck.ResourceActionUpdate),
+					},
+				},
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectKnownValue("betteredge_ted.test", tfjsonpath.New("description"), knownvalue.StringExact("updated by acceptance test")),
+				},
+			},
+			{
+				// Creation parameters can't change on an existing TED: the plan fails instead of replacing it.
+				Config:      strings.Replace(testAccTEDResourceConfig(password), "memory_gb   = 2", "memory_gb   = 4", 1),
+				ExpectError: regexp.MustCompile(`Can't change memory_gb of an existing TED`),
 			},
 		},
 	})

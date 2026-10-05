@@ -28,7 +28,7 @@ resource "betteredge_project" "example" {
 
 ### Optional
 
-- `description` (String) Free-text description for the project.
+- `description` (String) Free-text description for the project. If omitted, the current description is kept (empty for a new project); set it to `""` to clear it.
 
 ### Read-Only
 

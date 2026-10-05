@@ -96,6 +96,8 @@ func (p *BetterEdgeProvider) Resources(ctx context.Context) []func() resource.Re
 		NewProjectResource,
 		NewTEDResource,
 		NewPortForwardingResource,
+		NewSSHProxyResource,
+		NewLoadBalancerRuleResource,
 	}
 }
 

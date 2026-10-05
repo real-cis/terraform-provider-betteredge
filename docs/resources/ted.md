@@ -3,12 +3,12 @@
 page_title: "betteredge_ted Resource - betteredge"
 subcategory: ""
 description: |-
-  A Trusted Execution Domain (TED) on the BetterEdge platform. The platform API has no update endpoint, so every attribute forces replacement on change.
+  A Trusted Execution Domain (TED) on the BetterEdge platform. Only description can be changed after creation.
 ---
 
 # betteredge_ted (Resource)
 
-A Trusted Execution Domain (TED) on the BetterEdge platform. The platform API has no update endpoint, so every attribute forces replacement on change.
+A Trusted Execution Domain (TED) on the BetterEdge platform.
 
 ## Example Usage
 
@@ -34,7 +34,7 @@ resource "betteredge_ted" "example" {
 
 ### Required
 
-- `description` (String) Free-text description for the created TED.
+- `description` (String) Free-text description for the TED.
 - `memory_gb` (Number) Memory size in GB. Must be one of the values returned by the platform's config endpoint.
 - `os_name` (String) Operating system image to use. Must be one of the values returned by the platform's config endpoint.
 - `password` (String, Sensitive) Password for the default user. Required by the platform API regardless of include_ssh_keys.

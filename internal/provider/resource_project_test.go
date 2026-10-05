@@ -10,6 +10,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
+	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/hashicorp/terraform-plugin-testing/statecheck"
 	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
 )
@@ -36,9 +37,31 @@ func TestAccProjectResource(t *testing.T) {
 				ImportStateVerify: true,
 			},
 			{
-				Config: testAccProjectResourceConfig("tf-acc-test-renamed", "created by acceptance test"),
+				Config: testAccProjectResourceConfig("tf-acc-test-renamed", "updated by acceptance test"),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction("betteredge_project.test", plancheck.ResourceActionUpdate),
+					},
+				},
 				ConfigStateChecks: []statecheck.StateCheck{
 					statecheck.ExpectKnownValue("betteredge_project.test", tfjsonpath.New("name"), knownvalue.StringExact("tf-acc-test-renamed")),
+					statecheck.ExpectKnownValue("betteredge_project.test", tfjsonpath.New("description"), knownvalue.StringExact("updated by acceptance test")),
+				},
+			},
+			{
+				// Omitting description keeps the current one instead of clearing it.
+				Config: `
+resource "betteredge_project" "test" {
+  name = "tf-acc-test-renamed"
+}
+`,
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectEmptyPlan(),
+					},
+				},
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectKnownValue("betteredge_project.test", tfjsonpath.New("description"), knownvalue.StringExact("updated by acceptance test")),
 				},
 			},
 		},

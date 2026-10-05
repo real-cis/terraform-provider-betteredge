@@ -14,10 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listdefault"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -53,13 +50,15 @@ type TEDResourceModel struct {
 	ServerID       types.String `tfsdk:"server_id"`
 }
 
+var immutableTED = immutableAfterCreate{resourceName: "TED"}
+
 func (r *TEDResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_ted"
 }
 
 func (r *TEDResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "A Trusted Execution Domain (TED) on the BetterEdge platform. The platform API has no update endpoint, so every attribute forces replacement on change.",
+		MarkdownDescription: "A Trusted Execution Domain (TED) on the BetterEdge platform. Only `description` can be changed after creation.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:            true,
@@ -72,50 +71,47 @@ func (r *TEDResource) Schema(ctx context.Context, req resource.SchemaRequest, re
 				Required:            true,
 				MarkdownDescription: "UUID of the project the TED will be created in.",
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
+					immutableTED,
 				},
 			},
 			"os_name": schema.StringAttribute{
 				Required:            true,
 				MarkdownDescription: "Operating system image to use. Must be one of the values returned by the platform's config endpoint.",
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
+					immutableTED,
 				},
 			},
 			"vcpu": schema.Int64Attribute{
 				Required:            true,
 				MarkdownDescription: "Number of vCPUs. Must be one of the values returned by the platform's config endpoint.",
 				PlanModifiers: []planmodifier.Int64{
-					int64planmodifier.RequiresReplace(),
+					immutableTED,
 				},
 			},
 			"memory_gb": schema.Int64Attribute{
 				Required:            true,
 				MarkdownDescription: "Memory size in GB. Must be one of the values returned by the platform's config endpoint.",
 				PlanModifiers: []planmodifier.Int64{
-					int64planmodifier.RequiresReplace(),
+					immutableTED,
 				},
 			},
 			"storage_gb": schema.Int64Attribute{
 				Required:            true,
 				MarkdownDescription: "Storage size in GB. Must be one of the values returned by the platform's config endpoint.",
 				PlanModifiers: []planmodifier.Int64{
-					int64planmodifier.RequiresReplace(),
+					immutableTED,
 				},
 			},
 			"description": schema.StringAttribute{
 				Required:            true,
-				MarkdownDescription: "Free-text description for the created TED.",
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
+				MarkdownDescription: "Free-text description for the TED.",
 			},
 			"password": schema.StringAttribute{
 				Required:            true,
 				Sensitive:           true,
 				MarkdownDescription: "Password for the default user. Required by the platform API regardless of include_ssh_keys.",
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
+					immutableTED,
 				},
 			},
 			"include_ssh_keys": schema.BoolAttribute{
@@ -124,7 +120,7 @@ func (r *TEDResource) Schema(ctx context.Context, req resource.SchemaRequest, re
 				MarkdownDescription: "Whether to also grant SSH access via public_ssh_keys, in addition to the password.",
 				Default:             booldefault.StaticBool(false),
 				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.RequiresReplace(),
+					immutableTED,
 				},
 			},
 			"public_ssh_keys": schema.ListAttribute{
@@ -134,7 +130,7 @@ func (r *TEDResource) Schema(ctx context.Context, req resource.SchemaRequest, re
 				MarkdownDescription: "List of SSH public keys to authorize. Required when include_ssh_keys is true.",
 				Default:             listdefault.StaticValue(types.ListValueMust(types.StringType, []attr.Value{})),
 				PlanModifiers: []planmodifier.List{
-					listplanmodifier.RequiresReplace(),
+					immutableTED,
 				},
 			},
 			"module_id": schema.StringAttribute{
@@ -142,7 +138,8 @@ func (r *TEDResource) Schema(ctx context.Context, req resource.SchemaRequest, re
 				Computed:            true,
 				MarkdownDescription: "UUID of the module to place the TED on. If omitted, the platform chooses placement automatically.",
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
+					immutableTED,
 				},
 			},
 			"server_id": schema.StringAttribute{
@@ -150,7 +147,8 @@ func (r *TEDResource) Schema(ctx context.Context, req resource.SchemaRequest, re
 				Computed:            true,
 				MarkdownDescription: "UUID of the server to place the TED on. If omitted, the platform chooses placement automatically.",
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
+					immutableTED,
 				},
 			},
 		},
@@ -365,12 +363,27 @@ func (r *TEDResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
+type updateTEDRequest struct {
+	Description string `json:"description"`
+}
+
+// Update only calls the API when description changes.
 func (r *TEDResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var data TEDResourceModel
+	var data, state TEDResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+
+	if !data.Description.Equal(state.Description) {
+		body := updateTEDRequest{Description: data.Description.ValueString()}
+
+		if err := r.client.Do(ctx, http.MethodPatch, fmt.Sprintf("/api/vms/%s", data.Id.ValueString()), body, nil); err != nil {
+			resp.Diagnostics.AddError("BetterEdge API Error", fmt.Sprintf("Unable to update description of TED %s: %s", data.Id.ValueString(), err))
+			return
+		}
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

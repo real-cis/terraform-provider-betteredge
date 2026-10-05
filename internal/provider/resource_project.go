@@ -14,7 +14,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -62,17 +61,13 @@ func (r *ProjectResource) Schema(ctx context.Context, req resource.SchemaRequest
 				Validators: []validator.String{
 					stringvalidator.LengthBetween(4, 32),
 				},
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
 			},
 			"description": schema.StringAttribute{
 				Optional:            true,
 				Computed:            true,
-				MarkdownDescription: "Free-text description for the project.",
-				Default:             stringdefault.StaticString(""),
+				MarkdownDescription: "Free-text description for the project. If omitted, the current description is kept (empty for a new project); set it to `\"\"` to clear it.",
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 		},
@@ -107,6 +102,11 @@ func (r *ProjectResource) Create(ctx context.Context, req resource.CreateRequest
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+
+	// An omitted description is unknown at this point; a new project starts with an empty one.
+	if data.Description.IsUnknown() {
+		data.Description = types.StringValue("")
 	}
 
 	body := createProjectRequest{
@@ -156,11 +156,28 @@ type projectDetailsResponse struct {
 	Description string `json:"description"`
 }
 
+type updateProjectRequest struct {
+	ProjectID   string `json:"projectId"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
 func (r *ProjectResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var data ProjectResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	body := updateProjectRequest{
+		ProjectID:   data.Id.ValueString(),
+		Name:        data.Name.ValueString(),
+		Description: data.Description.ValueString(),
+	}
+
+	if err := r.client.Do(ctx, http.MethodPatch, "/api/project", body, nil); err != nil {
+		resp.Diagnostics.AddError("BetterEdge API Error", fmt.Sprintf("Unable to update project %s: %s", data.Id.ValueString(), err))
 		return
 	}
 
