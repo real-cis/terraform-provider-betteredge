@@ -58,7 +58,7 @@ func (r *TEDResource) Metadata(ctx context.Context, req resource.MetadataRequest
 
 func (r *TEDResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "A Trusted Execution Domain (TED) on the BetterEdge platform. Only `description` can be changed after creation.",
+		MarkdownDescription: "A Trusted Execution Domain (TED) on the BetterEdge platform.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:            true,

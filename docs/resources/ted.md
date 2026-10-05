@@ -3,7 +3,7 @@
 page_title: "betteredge_ted Resource - betteredge"
 subcategory: ""
 description: |-
-  A Trusted Execution Domain (TED) on the BetterEdge platform. Only description can be changed after creation.
+  A Trusted Execution Domain (TED) on the BetterEdge platform.
 ---
 
 # betteredge_ted (Resource)
