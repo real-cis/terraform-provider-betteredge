@@ -164,7 +164,7 @@ func (r *LoadBalancerRuleResource) Schema(ctx context.Context, req resource.Sche
 			},
 			"sni_key": schema.StringAttribute{
 				Optional:            true,
-				MarkdownDescription: "SNI domain used for TLS routing (e.g. `app.example.com`). Required when `type` is `SNI`. Must have a CNAME record to the project's SNI domain.",
+				MarkdownDescription: "SNI domain used for TLS routing (e.g. `app.example.com`). Required when `type` is `SNI`. Must have a CNAME record to `<project_id>.lb.betteredge.cloud`.",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},

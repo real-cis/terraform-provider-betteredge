@@ -49,7 +49,7 @@ resource "betteredge_loadbalancer_rule" "sni" {
 
 - `frontend_port` (Number) Public-facing port clients connect to. Required when `type` is `SNI`, where it must be one of the platform's SNI ports. Must be omitted for `TCP`, where the platform assigns it.
 - `proxy_protocol` (Boolean) Whether to send a PROXY v2 header to the backends so they see the real client address.
-- `sni_key` (String) SNI domain used for TLS routing (e.g. `app.example.com`). Required when `type` is `SNI`. Must have a CNAME record to the project's SNI domain.
+- `sni_key` (String) SNI domain used for TLS routing (e.g. `app.example.com`). Required when `type` is `SNI`. Must have a CNAME record to `<project_id>.lb.betteredge.cloud`.
 - `type` (String) `TCP` does plain TCP forwarding and has its frontend port assigned automatically by the platform. `SNI` does TLS routing by SNI domain on a shared frontend port and requires `frontend_port` and `sni_key`.
 
 ### Read-Only

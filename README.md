@@ -162,7 +162,7 @@ resource "betteredge_loadbalancer_rule" "sni" {
 }
 ```
 
-For SNI rules, the domain must point at the project's target with a CNAME record before the rule is created. Otherwise the platform rejects the rule with `LB_SNI_DOMAIN_NOT_VERIFIED`.
+For SNI rules, the domain must have a CNAME record to `<project_id>.lb.betteredge.cloud` before the rule is created. Otherwise the platform rejects the rule with `LB_SNI_DOMAIN_NOT_VERIFIED`.
 
 ## Example: managing multiple TEDs in a project
 
